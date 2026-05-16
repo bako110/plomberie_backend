@@ -5,35 +5,10 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
 const connectDB = require('./config/database');
-const uploadService = require('./uploads'); // Import du service d'upload
+const uploadService = require('./uploads');
 
 // Initialisation de l'application
 const app = express();
-
-// Connexion à la base de données
-connectDB();
-
-// Créer un utilisateur par défaut si aucun n'existe
-const initializeDefaultUser = async () => {
-  try {
-    const User = require('./models/User');
-    const userCount = await User.countDocuments();
-    
-    if (userCount === 0) {
-      const defaultUser = new User({
-        username: 'admin',
-        password: '1234'
-      });
-      await defaultUser.save();
-      console.log('👤 Utilisateur par défaut créé: admin / 1234');
-    }
-  } catch (error) {
-    console.error('Erreur lors de la création de l\'utilisateur par défaut:', error.message);
-  }
-};
-
-// Initialiser après la connexion DB
-setTimeout(initializeDefaultUser, 2000);
 
 // Middlewares de sécurité
 app.use(helmet());
@@ -126,15 +101,35 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Démarrage du serveur
+// Créer l'utilisateur admin par défaut si aucun n'existe
+const initializeDefaultUser = async () => {
+  try {
+    const User = require('./models/User');
+    const userCount = await User.countDocuments();
+    if (userCount === 0) {
+      const defaultUser = new User({ username: 'admin', password: '1234' });
+      await defaultUser.save();
+      console.log('👤 Utilisateur par défaut créé: admin / 1234');
+    }
+  } catch (error) {
+    console.error('Erreur création utilisateur par défaut:', error.message);
+  }
+};
+
+// Démarrage : DB d'abord, puis serveur
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(`🚀 Serveur démarré sur le port ${PORT}`);
-  console.log(`📍 Environnement: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 URL: http://localhost:${PORT}`);
-  console.log(`📁 Service d'upload: http://localhost:${PORT}/api/upload/status`);
-});
+const start = async () => {
+  await connectDB();
+  await initializeDefaultUser();
+  app.listen(PORT, () => {
+    console.log(`🚀 Serveur démarré sur le port ${PORT}`);
+    console.log(`📍 Environnement: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔗 URL: http://localhost:${PORT}`);
+  });
+};
+
+start();
 
 // Gestion de l'arrêt propre
 process.on('SIGTERM', () => {
